@@ -1,0 +1,98 @@
+<script src="http://danthecodingman.com:8080/socket.io/socket.io.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+<script src='http://danthecodingman.com/midiapp/WebMIDIAPI.js'></script>
+
+<script>
+	var m = null;
+	var outputs = null;
+	var inputs = null;
+	var input = null;
+	var out = null;
+	
+	// connect to io server
+	var socket = io.connect('http://danthecodingman.com:8080');
+	navigator.requestMIDIAccess().then( success, failure );
+	
+	function handleMIDIMessage( ev ) {
+		socket.emit('sendNote', ev.data);
+	}
+
+	function success( access ){
+		m = access;
+
+		inputs = m.inputs();
+		if (inputs)
+		{
+			input = inputs[0];
+		}
+		outputs = m.outputs();
+		input.addEventListener("midimessage", handleMIDIMessage);
+		out = m.outputs()[0];
+	};
+	
+	function failure( err ) {
+    		alert("Error code: " + err.code );
+	};
+
+ 
+	// on connection to server, ask for user's name
+	socket.on('connect', function(){
+
+		// call the server-side function 'adduser'
+		socket.emit('adduser', prompt("What's your name?"));
+  	});
+
+	// whenever the server emits 'updatechat', this updates the chat body
+	socket.on('updatechat', function (username, data) {
+		$('#conversation').append('<b>'+username + ':</b> ' + data + '<br>');
+	});
+
+	// whenever the server emits 'updateusers', this updates the user list
+	socket.on('updateusers', function(data) {
+		$('#users').empty();
+		$.each(data, function(key, value) {
+			$('#users').append('<div>' + key + '</div>');
+		});
+	});
+
+	// play MIDI event
+	socket.on('playnote', function(username, data) {
+		if (out)
+		{
+			var msg = [ data['0'], data['1'], data['2'] ];
+			out.send( msg );
+			console.log(username + ' is playing: ' + msg);
+		}
+	});
+	
+
+	// on load of page
+	$(function(){
+		// when the client clicks SEND
+		$('#datasend').click( function() {
+			var message = $('#data').val();
+			$('#data').val('');
+			// tell server to execute 'sendchat'
+			socket.emit('sendchat', message);
+		});
+
+		// when the client hits ENTER on their keyboard
+		$('#data').keypress(function(e) {
+			if(e.which == 13) {
+				$(this).blur();
+				$('#datasend').focus().click();
+			}
+		});
+	});
+
+</script>
+
+<div style="float:left;width:100px;border-right:1px solid black;height:300px;padding:10px;overflow:scroll-y;">
+  <b>USERS</b>
+  <div id="users"></div>
+</div>
+<div style="float:left;width:300px;height:250px;overflow:scroll-y;padding:10px;">
+  <div id="conversation"></div>
+  <input id="data" style="width:200px;" />
+  <input type="button" id="datasend" value="send" />
+</div>

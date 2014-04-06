@@ -1,0 +1,9 @@
+{
+        "name": "midi_app",
+        "description": "app for playing midi together",
+	"version": "0.0.1",
+	"dependencies": {
+		"express": "3.x",
+		"socket.io": "0.9.14"
+	}
+}

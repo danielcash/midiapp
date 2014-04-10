@@ -1,6 +1,13 @@
 <script src="http://danthecodingman.com:8080/socket.io/socket.io.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
 <script src='http://danthecodingman.com/midiapp/WebMIDIAPI.js'></script>
+<script src="//code.jquery.com/jquery-1.9.1.js"></script>
+<script src="//code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
+<link rel="stylesheet" href="stylesheet.css">
+
+<head>
+	<title>Dan's Multi-User MIDI Web Interface</title>
+</head>
 
 <script>
 	var m = null;
@@ -8,10 +15,15 @@
 	var inputs = null;
 	var input = null;
 	var out = null;
+	var user = null;
 	
 	// connect to io server
 	var socket = io.connect('http://danthecodingman.com:8080');
-	navigator.requestMIDIAccess().then( success, failure );
+
+	function activateMIDI()
+	{
+		navigator.requestMIDIAccess().then( success, failure );
+	}
 	
 	function handleMIDIMessage( ev ) {
 		socket.emit('sendNote', ev.data);
@@ -19,49 +31,108 @@
 
 	function success( access ){
 		m = access;
-
 		inputs = m.inputs();
 		if (inputs)
 		{
 			input = inputs[0];
+			if(input)
+			{
+			input.addEventListener("midimessage", handleMIDIMessage);
+			}
 		}
 		outputs = m.outputs();
-		input.addEventListener("midimessage", handleMIDIMessage);
-		out = m.outputs()[0];
+		if (outputs)
+		{
+			out = m.outputs()[0];
+		}
+		$("#enableMIDI").hide();
+		$("#instruction").text("Go ahead and play!");
 	};
 	
 	function failure( err ) {
-    		alert("Error code: " + err.code );
+		$( "#dialog" ).dialog();
+
+		alert("Error: MIDI interface not found!\n\nYou need a browser compatible with the Web MIDI API (Google Chrome) and the Jazz-Plugin (jazz-soft.net).");
 	};
 
  
 	// on connection to server, ask for user's name
 	socket.on('connect', function(){
-
-		// call the server-side function 'adduser'
-		socket.emit('adduser', prompt("What's your name?"));
+		addMe();
   	});
+
+	socket.on('askagain', function(){
+		alert("Username " + user + " already taken!\nChoose another!");
+		addMe();
+	});
+
+	function addMe()
+	{
+		user = null;
+		while (!user || /^\s+$/.test(user))
+		{
+			user = prompt("What's your name?");
+		}
+		// call the server-side function 'adduser'
+		socket.emit('adduser', user);
+	}
 
 	// whenever the server emits 'updatechat', this updates the chat body
 	socket.on('updatechat', function (username, data) {
 		$('#conversation').append('<b>'+username + ':</b> ' + data + '<br>');
+		$('#conversation').scrollTop($('#conversation')[0].scrollHeight);
 	});
 
 	// whenever the server emits 'updateusers', this updates the user list
 	socket.on('updateusers', function(data) {
 		$('#users').empty();
+		var count = 0;
 		$.each(data, function(key, value) {
-			$('#users').append('<div>' + key + '</div>');
+			$('#users').append('<div>' + value + '</div>');
+			count++;
 		});
+		$('#numUsers').text(count);
 	});
 
 	// play MIDI event
 	socket.on('playnote', function(username, data) {
-		if (out)
+		var msg = [ data['0'], data['1'], data['2'] ];
+		console.log(username + ' is playing: ' + msg);
+		
+		if (out && data['0'] != 208)
 		{
-			var msg = [ data['0'], data['1'], data['2'] ];
 			out.send( msg );
-			console.log(username + ' is playing: ' + msg);
+		}
+
+		var pitch = (data['1'] % 24);
+		var active = true;
+		if (data['2'] == 0) { active = false };
+
+		if (data['0'] == 144 || data['0'] == 128)
+		{
+		var key = document.getElementById("key" + pitch);
+		if (active)
+		{
+			if (key.className == "piano-key white")
+			{
+				key.className = "piano-key white down";
+			}
+			else if (key.className == "piano-key black")
+			{
+				key.className = "piano-key black down";
+			}
+		}
+		else
+		{
+			if (key.className == "piano-key white down")
+			{
+				key.className = "piano-key white";
+			}
+			else if (key.className == "piano-key black down")
+			{
+				key.className = "piano-key black";
+			}
+		}
 		}
 	});
 	
@@ -73,7 +144,10 @@
 			var message = $('#data').val();
 			$('#data').val('');
 			// tell server to execute 'sendchat'
-			socket.emit('sendchat', message);
+			if (message) {
+				socket.emit('sendchat', message);
+			}
+			$('#data').focus();
 		});
 
 		// when the client hits ENTER on their keyboard
@@ -87,12 +161,68 @@
 
 </script>
 
-<div style="float:left;width:100px;border-right:1px solid black;height:300px;padding:10px;overflow:scroll-y;">
-  <b>USERS</b>
-  <div id="users"></div>
+<div style="float:left;width:150px;height:300px;padding:10px;overflow-y:scroll;border:1px solid black;">
+	<b>USERS (</b>
+	<b id="numUsers">0</b>
+	<b>)</b>
+	<div id="users"></div>
 </div>
-<div style="float:left;width:300px;height:250px;overflow:scroll-y;padding:10px;">
-  <div id="conversation"></div>
-  <input id="data" style="width:200px;" />
-  <input type="button" id="datasend" value="send" />
+
+<div style="float:left;width:500px;height:480px;overflow:scroll-y;padding:10px;border:1px solid black;">
+	<div style="width:500px;height:250px; border-width: 1px; border-style: solid; overflow-y:scroll" id="conversation"></div>
+	<div style="margin-top:10px">
+	<input id="data" style="width:400px;" />
+	<input style="float:right" type="button" id="datasend" value="send" />
+	
+	<div id="keyboard" style="clear:both; margin-top:10px;">
+
+	 <div id="main">
+            <div class="keyboard">
+                <div class="backboard"></div>
+                <div class="keys">
+                    <div id="key0" data-note="2C" class="piano-key white" title="C2"></div>
+                    <div id="key1" data-note="2C#" class="piano-key black" title="C#2"></div>
+                    <div id="key2" data-note="2D" class="piano-key white" title="D2"></div>
+                    <div id="key3" data-note="2D#" class="piano-key black" title="D#2"></div>
+                    <div id="key4" data-note="2E" class="piano-key white" title="E2"></div>
+                    <div id="key5" data-note="2F" class="piano-key white" title="F2"></div>
+                    <div id="key6" data-note="2F#" class="piano-key black" title="F#2"></div>
+                    <div id="key7" data-note="2G" class="piano-key white" title="G2"></div>
+                    <div id="key8" data-note="2G#" class="piano-key black" title="G#2"></div>
+                    <div id="key9" data-note="2A" class="piano-key white" title="A2"></div>
+                    <div id="key10" data-note="2A#" class="piano-key black" title="A#2"></div>
+                    <div id="key11" data-note="2B" class="piano-key white" title="B2"></div>
+                    <div id="key12" data-note="3C" class="piano-key white" title="C3"></div>
+                    <div id="key13" data-note="3C#" class="piano-key black" title="C#3"></div>
+                    <div id="key14" data-note="3D" class="piano-key white" title="D3"></div>
+                    <div id="key15" data-note="3D#" class="piano-key black" title="D#3"></div>
+                    <div id="key16" data-note="3E" class="piano-key white" title="E3"></div>
+                    <div id="key17" data-note="3F" class="piano-key white" title="F3"></div>
+                    <div id="key18" data-note="3F#" class="piano-key black" title="F#3"></div>
+                    <div id="key19" data-note="3G" class="piano-key white" title="G3"></div>
+                    <div id="key20" data-note="3G#" class="piano-key black" title="G#3"></div>
+                    <div id="key21" data-note="3A" class="piano-key white" title="A3"></div>
+                    <div id="key22" data-note="3A#" class="piano-key black" title="A#3"></div>
+                    <div id="key23" data-note="3B" class="piano-key white" title="B3"></div>
+                    <div id="key24" data-note="4C" class="piano-key white" title="C4"></div>
+                </div>
+            </div>
+        </div>
+
+	</div>
+
+	</div>
+</div>
+
+<div style="float:left;width:400px;height:250px;padding:10px;">
+	<h1>Dan's Multi-User MIDI Web Interface</h1>
+	<input type="button" id="enableMIDI" value="activate MIDI" onclick="activateMIDI();" />
+
+	<div style="margin-top:40px">
+	<p id="instruction">Press "activate MIDI" to start playing/listening to music with other users.
+	</p>
+	<p>
+	Note: You need a compatible browser (Google Chrome) and <a href="http://jazz-soft.net">Jazz-Plugin</a>.
+	</p>
+	</div>
 </div>

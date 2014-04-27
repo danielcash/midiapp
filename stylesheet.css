@@ -102,3 +102,34 @@
 {
     background-color: red;
 }
+
+#chordbox
+{
+	margin-top: 10px;
+	border: 1px solid black;
+	border-radius: 15px;
+	background-color: #DDDDDD;
+	text-align: center;
+	height: 40px;
+	line-height: 40px;
+	width: 500px;
+	display: table;
+}
+
+#chord
+{
+	font-size: 18;
+	color: #9999FF;
+	font-weight: bold;
+	font-family: Arial;
+	display: table-cell;
+	vertical-align: middle;
+	line-height: normal;
+
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}

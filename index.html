@@ -94,6 +94,19 @@
 		$('#numUsers').text(count);
 	});
 
+	// set chord
+	socket.on('setchord', function(chordstring) {
+		if (chordstring != "Play a Chord")
+		{
+			$('#chord').css({"color":"black"});
+		}
+		else
+		{
+			$('#chord').css({"color":"#9999FF"});
+		}
+		$('#chord').text(chordstring);
+	});
+
 	// play MIDI event
 	socket.on('playnote', function(username, data) {
 		var msg = [ data['0'], data['1'], data['2'] ];
@@ -168,11 +181,14 @@
 	<div id="users"></div>
 </div>
 
-<div style="float:left;width:500px;height:480px;overflow:scroll-y;padding:10px;border:1px solid black;">
+<div style="float:left;width:500px;height:525px;overflow:scroll-y;padding:10px;border:1px solid black;">
 	<div style="width:500px;height:250px; border-width: 1px; border-style: solid; overflow-y:scroll" id="conversation"></div>
 	<div style="margin-top:10px">
 	<input id="data" style="width:400px;" />
 	<input style="float:right" type="button" id="datasend" value="send" />
+	<div id="chordbox">
+	<span id="chord" unselectable="on">Play a Chord</span>
+	</div>
 	
 	<div id="keyboard" style="clear:both; margin-top:10px;">
 
@@ -223,6 +239,9 @@
 	</p>
 	<p>
 	Note: You need a compatible browser (Google Chrome) and <a href="http://jazz-soft.net">Jazz-Plugin</a>.
+	</p>
+	<p>
+	In Google Chrome, activate MIDI: <b>chrome://flags/#enable-web-midi</b>
 	</p>
 	</div>
 </div>

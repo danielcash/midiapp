@@ -13,6 +13,10 @@ server.listen(8080);
 
 var usernames = {};
 var messages = [];
+var pitches = {};
+var numPitches = 0;
+
+var exec = require('child_process').execFile;
 
 io.sockets.on('connection', function(socket) {
 	// when the client emits sendchat, this listens and executes
@@ -70,5 +74,39 @@ io.sockets.on('connection', function(socket) {
 	socket.on('sendNote', function(data) {
 		// broadcast MIDI event to all users
 		io.sockets.emit('playnote', socket.username, data);
+
+		if (data['0'] == 144 || data['0'] == 128)
+		{
+			var pitch = data['1'] % 24;
+			
+			if (data['2'] == 0)
+			{
+				delete pitches[pitch];
+				numPitches--;
+			}
+			else
+			{
+				pitches[pitch] = pitch;
+				numPitches++;
+			}
+		}
+
+		if (numPitches >= 3)
+		{
+			var list = ["chord_analysis.py"];
+			for (var key in pitches)
+			{
+				list.push(key);
+			}
+			exec('python', list, function(err, stdout, stderr) {
+				console.log(err);
+				io.sockets.emit('setchord', stdout);
+			});
+		}
+		else
+		{
+			io.sockets.emit('setchord', "Play a Chord");
+		}
 	});
+
 });
